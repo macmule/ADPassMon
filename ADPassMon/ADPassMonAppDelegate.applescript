@@ -750,7 +750,13 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         fmt's setMinimumSignificantDigits_(1)
         fmt's setDecimalSeparator_(".")
         
+        -- Try & get last set date via dscl, if nothing returned, try via ldap
         set my pwdSetDateUnix to (do shell script "/usr/bin/dscl localhost read /Search/Users/\"$USER\" SMBPasswordLastSet | /usr/bin/awk '/LastSet:/{print $2}'")
+        if (count words of pwdSetDateUnix) is equal to 0
+            set my pwdSetDateUnix to (do shell script "/usr/bin/ldapsearch -LLLL -Q -H ldap://" & myLDAP & " -b " & mySearchBase & " -s sub \"sAMAccountName=$USER\" pwdLastSet | /usr/bin/awk '/pwdLastSet:/{print $2}'")
+            log "psychodata91 pwdSetDateUnix via LDAP: " & pwdSetDateUnix
+        end if
+
         if (count words of pwdSetDateUnix) is greater than 0
             set my pwdSetDateUnix to last word of pwdSetDateUnix
             set my pwdSetDateUnix to ((pwdSetDateUnix as integer) / 10000000 - 11644473600)
@@ -822,8 +828,8 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             tell defaults to set unixDate to objectForKey_("expireDateUnix") as integer
             tell defaults to set tooltip to objectForKey_("tooltip") as string
             set todayUnix to do shell script "/bin/date +%s"
-            set daysUntilExp to ((unixDate - todayUnix) / 86400)
-            set daysUntilExpNice to round daysUntilExp rounding toward zero
+            set my daysUntilExp to ((unixDate - todayUnix) / 86400)
+            set my daysUntilExpNice to round daysUntilExp rounding toward zero
             updateMenuTitle_((daysUntilExpNice as string) & "d", tooltip)
         on error theError
             errorOut_(theError, 1)
@@ -844,7 +850,8 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             set my daysUntilExp to fmt's stringFromNumber_(expireAge - (today - pwdSetDate)) as real -- removed 'as integer' to avoid rounding issue
             log "  daysUntilExp: " & daysUntilExp
             set my daysUntilExpNice to round daysUntilExp rounding toward zero
-            --log "  daysUntilExpNice: " & daysUntilExpNice
+            log "  daysUntilExpNice: " & daysUntilExpNice
+            log "  macmule test^^"
         on error theError
             errorOut_(theError, 1)
         end try
@@ -926,8 +933,9 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 else
                     log "  Using alt method"
                     getPwdSetDate_(me)
-                    compareDates_(me)
-                    getExpirationDate_(daysUntilExp)
+                    --compareDates_(me)
+                    --getExpirationDate_(daysUntilExp)
+                    offlineUpdate_(me)
                 end if
                 
                 updateMenuTitle_((daysUntilExpNice as string) & "d", "Your password expires\n" & expirationDate)
