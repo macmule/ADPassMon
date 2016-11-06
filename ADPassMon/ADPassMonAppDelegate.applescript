@@ -37,6 +37,8 @@ script ADPassMonAppDelegate
     property NSTimer :                  class "NSTimer" -- so we can do stuff at regular intervals
     property NSUserNotificationCenter : class "NSUserNotificationCenter" -- for notification center
     property NSWorkspace :              class "NSWorkspace" -- for sleep notification
+    property NSNumberFormatter :        class "NSNumberFormatter" -- for number formatting
+    property NSLocale :                 class "NSLocale" -- for locale
 
 --- Objects
     property standardUserDefaults : missing value
@@ -83,7 +85,10 @@ If you do not know your keychain password, enter your new password in the New an
     property buildVersion : missing value
     property userName : missing value
     property fmt : missing value
-
+    property domain : missing value
+    property numberFormatter : missing value
+    property usLocale : missing value
+    
 --- Booleans
     property first_run :                true
     property runIfLocal :               false
@@ -162,7 +167,7 @@ If you do not know your keychain password, enter your new password in the New an
         set appVersion to mainBundle's objectForInfoDictionaryKey_("CFBundleShortVersionString")
         set buildVersion to mainBundle's objectForInfoDictionaryKey_("CFBundleVersion")
         -- Log ADPassMon version
-        set logMe to "ADPassMon Version: " & appVersion & "(" & buildVersion & ")"
+        set logMe to "ADPassMon Version: " & appVersion & " (" & buildVersion & ")"
         logToFile_(me)
     end logVersion_
     
@@ -434,7 +439,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         tell defaults to set my enableNotifications to objectForKey_("enableNotifications") as integer
         tell defaults to set my passwordCheckInterval to objectForKey_("passwordCheckInterval") as integer
         tell defaults to set my expireAge to objectForKey_("expireAge") as integer
-        tell defaults to set my expireDateUnix to objectForKey_("expireDateUnix") as integer
+        tell defaults to set my expireDateUnix to objectForKey_("expireDateUnix")
         tell defaults to set my pwdSetDate to objectForKey_("pwdSetDate") as integer
         tell defaults to set my warningDays to objectForKey_("warningDays")
         tell defaults to set my prefsLocked to objectForKey_("prefsLocked")
@@ -800,16 +805,17 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
     on getPwdSetDate_(sender)
         -- Try & get last set date via dscl, if nothing returned, try via ldap
         set my pwdSetDateUnix to (do shell script "/usr/bin/dscl localhost read /Search/Users/" & quoted form of userName & " SMBPasswordLastSet | /usr/bin/awk '/LastSet:/{print $2}'")
+        set logMe to "pwdSetDateUnix via DSCL: " & pwdSetDateUnix
+        logToFile_(me)
         if (count words of pwdSetDateUnix) is equal to 0
             set my pwdSetDateUnix to (do shell script "/usr/bin/ldapsearch -LLLL -Q -H ldap://" & myLDAP & " -b " & mySearchBase & " -s sub \"sAMAccountName=" & quoted form of userName & "\" pwdLastSet | /usr/bin/awk '/pwdLastSet:/{print $2}'")
             set logMe to "pwdSetDateUnix via LDAP: " & pwdSetDateUnix
             logToFile_(me)
         end if
-
         if (count words of pwdSetDateUnix) is greater than 0
             set my pwdSetDateUnix to last word of pwdSetDateUnix
             set my pwdSetDateUnix to ((pwdSetDateUnix as integer) / 10000000 - 11644473600)
-            set my pwdSetDate to fmt's stringFromNumber_(pwdSetDateUnix / 86400)
+            set my pwdSetDate to numberFormatter's stringFromNumber_(pwdSetDateUnix / 86400)
         else if (count words of pwdSetDateUnix) is equal to 0
             set my pwdSetDate to -1
         end if
@@ -817,9 +823,15 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         logToFile_(me)
         -- Now we compare the plist's value for pwdSetDate to the one we just calculated so
         -- we avoid using an old or bad value (i.e. when SMBPasswordLastSet can't be found by dscl)
-        tell defaults to set plistPwdSetDate to objectForKey_("pwdSetDate") as real
+        --tell defaults to set plistPwdSetDate to objectForKey_("pwdSetDate") as real
         statusMenu's setAutoenablesItems_(false)
-        if plistPwdSetDate is less than or equal to pwdSetDate
+        if plistPwdSetDate is equal to 0
+            set my skipKerb to true
+            log "Cannot get pwdSetDate"
+            tell defaults to setObject_forKey_(pwdSetDate, "pwdSetDate")
+            statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(not skipKerb)
+            statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(not skipKerb)
+        else if plistPwdSetDate is less than or equal to pwdSetDate
             set logMe to "pwdSetDate ≥ plist value (" & plistPwdSetDate & ") so we use it"
             logToFile_(me)
             tell defaults to setObject_forKey_(pwdSetDate, "pwdSetDate")
@@ -850,7 +862,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 return
             end if
             set my expireDateUnix to do shell script "echo '(" & expireDate & "/10000000)-11644473600' | /usr/bin/bc"
-            set logMe to "Got expireDateUnix: " & expireDateUnix
+            set logMe to "Got expireDateUnix from msDS: " & expireDateUnix
             logToFile_(me)
             tell defaults to setObject_forKey_(expireDateUnix, "expireDateUnix")
         on error theError
@@ -873,8 +885,10 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
     -- from the plist, which we assume was updated the last time the domain was accessible.
     on offlineUpdate_(sender)
         try
-            set logMe to "Reading expireDateUnix from plist: " & expireDateUnix
-            logToFile_(me)
+            if onDomain is false
+                set logMe to "Using expireDateUnix: " & expireDateUnix
+                logToFile_(me)
+            end if
             tell defaults to set tooltip to objectForKey_("tooltip") as string
             set todayUnix to do shell script "/bin/date +%s"
             set my daysUntilExp to ((expireDateUnix - todayUnix) / 86400)
@@ -899,11 +913,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
 
     -- The meat of the app; gets the data and does the calculations 
     on doProcess_(sender)
-        set logMe to "Setting number formatter..."
-        logToFile_(me)
-        set logMe to "Set number formatter..."
-        logToFile_(me)
-        domainTest_(me)
+        intervaldomainTest_(me)
         if selectedMethod = 0
             set logMe to "Starting auto process…"
             logToFile_(me)
@@ -928,11 +938,6 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                         getExpireAge_(me)
                     end if
                 else
-                    --set logMe to "Found expireDateUnix in plist before: " & expireDateUnix
-                    --logToFile_(me)
-                    --set expireDateUnix to fmt's stringFromNumber_(expireDateUnix)
-                    set logMe to "Found expireDateUnix in plist: " & expireDateUnix
-                    logToFile_(me)
                     easyMethod_(me)
                 end if
                 if my goEasy is true and my selectedMethod = 0
@@ -945,11 +950,12 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                     getPwdSetDate_(me)
                     offlineUpdate_(me)
                 end if
-                
+
                 updateMenuTitle_((daysUntilExpNice as string) & "d", "Your password expires\n" & expirationDate)
                 set my theMessage to "Your password expires in " & daysUntilExpNice & " days\non " & expirationDate
                 set my isIdle to true
                 doNotify_(daysUntilExpNice)
+
             else
                 set logMe to "Offline. Updating menu…"
                 logToFile_(me)
@@ -1712,7 +1718,7 @@ Please choose your configuration options."
         notifySetup_(me)
         doSelectedBehaviourCheck_(me) -- Check for Selected Behaviour
         createMenu_(me)  -- build and display the status menu item
-        intervaldomainTest_(me)  -- test domain connectivity
+        intervalDomainTest_(me)  -- test domain connectivity
 
         -- Set a timer to check for domain connectivity every five minutes. (300)
         set my domainTimer to NSTimer's scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(300, me, "intervalDomainTest:", missing value, true)
@@ -1748,13 +1754,16 @@ Please choose your configuration options."
         logVersion_(me)
         getOS_(me)
         getUserName_(me)
-        -- number formatter for truncated decimal places
-        set fmt to current application's NSNumberFormatter's alloc()'s init()
-        fmt's setUsesSignificantDigits_(true)
-        fmt's setMaximumSignificantDigits_(7)
-        fmt's setMinimumSignificantDigits_(1)
-        fmt's setDecimalSeparator_(".")
-        fmt's setNumberStyle:(current application's NSNumberFormatterNoStyle)
+        -- To try & correct decimal mark issues
+        set numberFormatter to NSNumberFormatter's alloc()'s init()
+        set usLocale to NSLocale's alloc()'s initWithLocaleIdentifier_("en_US")
+        numberFormatter's setUsesSignificantDigits_(true)
+        numberFormatter's setMaximumSignificantDigits_(7)
+        numberFormatter's setMinimumSignificantDigits_(1)
+        numberFormatter's setDecimalSeparator_(".")
+        numberFormatter's setNumberStyle:(current application's NSNumberFormatterNoStyle)
+        set logMe to "Set number formatter"
+        logToFile_(me)
         regDefaults_(me) -- populate plist file with defaults (will not overwrite non-default settings))
         retrieveDefaults_(me) -- load defaults (from plist)
         localAccountStatus_(me)
