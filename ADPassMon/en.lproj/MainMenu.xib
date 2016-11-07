@@ -69,6 +69,11 @@
                                                         <font key="font" metaFont="system"/>
                                                         <connections>
                                                             <action selector="useManualMethod:" target="494" id="975"/>
+                                                            <binding destination="494" name="value" keyPath="selectedMethod" id="QUb-o2-Wz5">
+                                                                <dictionary key="options">
+                                                                    <string key="NSValueTransformerName">NSNegateBoolean</string>
+                                                                </dictionary>
+                                                            </binding>
                                                         </connections>
                                                     </buttonCell>
                                                 </column>
@@ -78,6 +83,7 @@
                                                         <font key="font" metaFont="system"/>
                                                         <connections>
                                                             <action selector="selectText:" target="941" id="960"/>
+                                                            <binding destination="494" name="value" keyPath="selectedMethod" id="d8b-JC-sSV"/>
                                                         </connections>
                                                     </buttonCell>
                                                 </column>
@@ -269,6 +275,8 @@
                                             </textFieldCell>
                                             <connections>
                                                 <action selector="useManualMethod:" target="494" id="976"/>
+                                                <binding destination="494" name="enabled" keyPath="self" id="FfZ-LJ-nVE"/>
+                                                <binding destination="494" name="value" keyPath="selectedMethod" id="Jl6-s3-lz4"/>
                                             </connections>
                                         </textField>
                                     </subviews>
