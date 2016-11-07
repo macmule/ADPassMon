@@ -521,47 +521,9 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
     on ticketViewer_(sender)
         tell application "Ticket Viewer" to activate
     end ticketViewer_
-    
+
     -- Test to see if we're on the domain
     on domainTest_(sender)
-        set domain to (do shell script "/usr/sbin/dsconfigad -show | /usr/bin/awk '/Active Directory Domain/{print $NF}'") as text
-        try
-            set digResult to (do shell script "/usr/bin/dig +time=2 +tries=1 -t srv _ldap._tcp." & domain) as text
-        on error theError
-            set logMe to "Domain test timed out."
-            logToFile_(me)
-            set my onDomain to false
-            my statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(0)
-            my statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(0)
-            return
-        end try
-        if "ANSWER SECTION" is in digResult
-            set my onDomain to true
-            set logMe to "Domain reachable."
-            logToFile_(me)
-            my statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(1)
-            -- Set variable to boolean
-            set allowPasswordChange to allowPasswordChange as boolean
-            tell defaults to set my pwPolicyURLButtonTitle to objectForKey_("pwPolicyURLButtonTitle") as string
-            tell defaults to set my pwPolicyURLButtonURL to objectForKey_("pwPolicyURLButtonURL") as string
-            -- If password change is allowed, show
-            if allowPasswordChange is true
-                my statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(1)
-            -- If password change is not allowed, but a password policy is set, show (as this will show policy).
-            else if pwPolicyURLButtonTitle is not equal to "" and pwPolicyURLButtonURL is not equal to ""
-                my statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(1)
-            end if
-        else
-            set my onDomain to false
-            set logMe to "Domain not reachable."
-            logToFile_(me)
-            my statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(0)
-            my statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(0)
-        end if
-    end domainTest_
-
-       -- Test to see if we're on the domain
-    on intervalDomainTest_(sender)
         -- Grab domain name from bind information
         set domain to (do shell script "/usr/sbin/dsconfigad -show | /usr/bin/awk '/Active Directory Domain/{print $NF}'") as text
         -- Test domain connectivity
@@ -573,7 +535,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             set my onDomain to false
             my statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(0)
             my statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(0)
-            offlineUpdate_(me)
+            return
         end try
         -- For UI update
         delay 0.1
@@ -642,7 +604,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 logToFile_(me)
             end if
         end if
-    end intervalDomainTest_
+    end domainTest_
 
     -- Check if password is set to never expire
     on canPassExpire_(sender)
@@ -700,7 +662,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             doProcess_(me)
         on error theError
             set my theMessage to "Kerberos ticket expired or not found"
-            set logMe to "No ticket found"
+            set logMe to theMessage
             logToFile_(me)
             activate
             set response to (display dialog "No Kerberos ticket for Active Directory was found. Do you want to renew it?" with icon 2 buttons {"No","Yes"} default button 2)
@@ -966,17 +928,13 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             set logMe to "Offline expirationDate: " & expirationDate
             logToFile_(me)
             updateMenuTitle_(daysUntilExpNice, expirationDate)
-        on error theError
-            errorOut_(theError, 1)
         end try
     end offlineUpdate_
 
     -- Updates the menu's title and tooltip
     on updateMenuTitle_(daysUntilExpNice, expirationDate)
-        tell defaults to setObject_forKey_(daysUntilExpNice, "menu_title")
-        tell defaults to setObject_forKey_(tooltip, "tooltip")
-        updateMenuTitle_((daysUntilExpNice as string) & "d", "Your password expires\n" & expirationDate)
-        set my theMessage to "Your password expires in " & daysUntilExpNice & " days\non " & expirationDate
+        tell defaults to setObject_forKey_((daysUntilExpNice as string) & "d", "menu_title")
+        tell defaults to setObject_forKey_("Your password expires on:\n" & expirationDate, "tooltip")
         set my isIdle to true
         doNotify_(daysUntilExpNice)
         statusMenuController's updateDisplay()
@@ -984,7 +942,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
 
     -- The meat of the app; gets the data and does the calculations 
     on doProcess_(sender)
-        intervaldomainTest_(me)
+        domainTest_(me)
         if selectedMethod = 0
             set logMe to "Starting auto process…"
             logToFile_(me)
@@ -1015,8 +973,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 if my goEasy is true and my selectedMethod = 0
                     set logMe to "Using msDS method"
                     logToFile_(me)
-                    --easyDate_(expireDateUnix)
-                    altMethod_(me)
+                    easyDate_(expireDateUnix)
                 else
                     set logMe to "Using alt method"
                     logToFile_(me)
@@ -1789,7 +1746,7 @@ Please choose your configuration options."
         doProcess_(me)
 
         -- Set a timer to check for domain connectivity every five minutes. (300)
-        set my domainTimer to NSTimer's scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(300, me, "intervalDomainTest:", missing value, true)
+        set my domainTimer to NSTimer's scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(300, me, "domainTest:", missing value, true)
 
         -- Set a timer to trigger doProcess handler on an interval and spawn notifications (if enabled).
         set my processTimer to NSTimer's scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_((my passwordCheckInterval * 3600), me, "intervalDoProcess:", missing value, true)
