@@ -408,7 +408,6 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                                             pwdSetDate:pwdSetDate, ¬
                                             warningDays:warningDays, ¬
                                             prefsLocked:prefsLocked, ¬
-                                            myLDAP:myLDAP, ¬
                                             pwPolicy:pwPolicy, ¬
                                             pwPolicyButton:pwPolicyButton, ¬
                                             accTest:accTest, ¬
@@ -443,7 +442,6 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         tell defaults to set my pwdSetDate to objectForKey_("pwdSetDate") as integer
         tell defaults to set my warningDays to objectForKey_("warningDays")
         tell defaults to set my prefsLocked to objectForKey_("prefsLocked")
-        tell defaults to set my myLDAP to objectForKey_("myLDAP")
         tell defaults to set my pwPolicy to objectForKey_("pwPolicy")
         tell defaults to set my pwPolicyButton to objectForKey_("pwPolicyButton")
         tell defaults to set my accTest to objectForKey_("accTest") as integer
@@ -569,13 +567,13 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         -- Test domain connectivity
         try
             set digResult to (do shell script "/usr/bin/dig +time=2 +tries=1 -t srv _ldap._tcp." & domain) as text
-        on error theError
-            set logMe to "Interval domain test timed out."
+        on error
+            set logMe to "Domain test timed out."
             logToFile_(me)
             set my onDomain to false
             my statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(0)
             my statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(0)
-            return
+            offlineUpdate_(me)
         end try
         -- For UI update
         delay 0.1
@@ -805,11 +803,12 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
     on getPwdSetDate_(sender)
         -- Try & get last set date via dscl, if nothing returned, try via ldap
         set my pwdSetDateUnix to (do shell script "/usr/bin/dscl localhost read /Search/Users/" & quoted form of userName & " SMBPasswordLastSet | /usr/bin/awk '/LastSet:/{print $2}'")
-        set logMe to "pwdSetDateUnix via DSCL: " & pwdSetDateUnix
-        logToFile_(me)
         if (count words of pwdSetDateUnix) is equal to 0
             set my pwdSetDateUnix to (do shell script "/usr/bin/ldapsearch -LLLL -Q -H ldap://" & myLDAP & " -b " & mySearchBase & " -s sub \"sAMAccountName=" & quoted form of userName & "\" pwdLastSet | /usr/bin/awk '/pwdLastSet:/{print $2}'")
             set logMe to "pwdSetDateUnix via LDAP: " & pwdSetDateUnix
+            logToFile_(me)
+        else
+            set logMe to "pwdSetDateUnix via DSCL: " & last word of pwdSetDateUnix
             logToFile_(me)
         end if
         if (count words of pwdSetDateUnix) is greater than 0
@@ -853,7 +852,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
     -- Uses 'msDS-UserPasswordExpiryTimeComputed' value from AD to get expiration date.
     on easyMethod_(sender)
         try
-            set expireDateResult to (do shell script "/usr/bin/dscl localhost read /Search/Users/" & quoted form of userName & " msDS-UserPasswordExpiryTimeComputed")
+            set expireDateResult to last paragraph of (do shell script "/usr/bin/dscl localhost read /Search/Users/" & quoted form of userName & " msDS-UserPasswordExpiryTimeComputed")
             if "msDS-UserPasswordExpiryTimeComputed" is in expireDateResult
                 set my goEasy to true
                 set my expireDate to last word of expireDateResult
@@ -869,45 +868,117 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             errorOut_(theError, 1)
         end try
     end easyMethod_
-    
+
+    -- Use epoch to get expiration date
     on easyDate_(timestamp)
         set my expirationDate to do shell script "/bin/date -r" & timestamp
-        set todayUnix to do shell script "/bin/date +%s"
+        set logMe to "expirationDate: " & expirationDate
+        logToFile_(me)
+        set todayUnix to (do shell script "/bin/date +%s")
+        set logMe to "Today epoch: " & todayUnix
+        logToFile_(me)
         set my daysUntilExp to ((timestamp - todayUnix) / 86400)
-        set logMe to "daysUntilExp: " & daysUntilExp
+        set logMe to "ms-DS daysUntilExp: " & daysUntilExp
         logToFile_(me)
-        set my daysUntilExpNice to round daysUntilExp rounding toward zero
-        set logMe to "daysUntilExpNice: " & daysUntilExpNice
+        set my daysUntilExpNice to round daysUntilExp rounding down
+        set logMe to "ms-DS daysUntilExpNice: " & daysUntilExpNice
         logToFile_(me)
+        updateMenuTitle_(daysUntilExpNice, expirationDate)
     end easyDate_
+
+    -- If ms-DS cannot be used, try via DSCL and if that fails LDAP
+    on altMethod_(sender)
+        getSearchBase_(me)
+        -- If we're set to Automatic discovery
+        if selectedMethod is 0
+            getExpireAge_(me)
+        end if
+        set my pwdSetDateUnix to (do shell script "/usr/bin/dscl localhost read /Search/Users/" & quoted form of userName & " SMBPasswordLastSet | /usr/bin/awk '/LastSet:/{print $2}'")
+        if (count words of pwdSetDateUnix) is equal to 0
+            set my pwdSetDateUnix to (do shell script "/usr/bin/ldapsearch -LLLL -Q -H ldap://" & myLDAP & " -b " & mySearchBase & " -s sub \"sAMAccountName=" & quoted form of userName & "\" pwdLastSet | /usr/bin/awk '/pwdLastSet:/{print $2}'")
+            set logMe to "pwdSetDateUnix via LDAP: " & pwdSetDateUnix
+            logToFile_(me)
+        else
+            set logMe to "pwdSetDateUnix via DSCL: " & last word of pwdSetDateUnix
+            logToFile_(me)
+        end if
+        if pwdSetDateUnix is equal to 0
+            set logMe to "Cannot get pwdSetDate"
+            logToFile_(me)
+        else
+            set my pwdSetDateUnix to last word of pwdSetDateUnix
+            set my pwdSetDateUnix to ((pwdSetDateUnix as integer) / 10000000 - 11644473600)
+            set my pwdSetDate to numberFormatter's stringFromNumber_(pwdSetDateUnix)
+            set logMe to "pwdSetDate epoch: " & pwdSetDate
+            logToFile_(me)
+            altGetExpiryDate_(me)
+        end if
+    end altMethod_
+
+    -- Calculate the number of days until password expiration
+    on altGetExpiryDate_(sender)
+        try
+            set todayUnix to (do shell script "/bin/date +%s")
+            set logMe to "Today epoch: " & todayUnix
+            logToFile_(me)
+            set daysSinceSet to (todayUnix - pwdSetDate) / 86400
+            set logMe to "Days Since Set: " & daysSinceSet
+            logToFile_(me)
+            set my daysUntilExp to (expireAge - daysSinceSet)
+            set logMe to "alt daysUntilExp: " & daysUntilExp
+            logToFile_(me)
+            set my daysUntilExpNice to round daysUntilExp rounding down
+            set logMe to "alt daysUntilExpNice: " & daysUntilExpNice
+            logToFile_(me)
+            set secondsTilExpiry to numberFormatter's stringFromNumber_((expireAge - daysSinceSet) * 86400 as integer)
+            set logMe to "alt secondsTilExpiry: " & secondsTilExpiry
+            logToFile_(me)
+            set my expireDateUnix to numberFormatter's stringFromNumber_(todayUnix + secondsTilExpiry)
+            set logMe to "Got expireDateUnix from alt: " & expireDateUnix
+            logToFile_(me)
+            tell defaults to setObject_forKey_(expireDateUnix, "expireDateUnix")
+            set my expirationDate to do shell script "/bin/date -r" & expireDateUnix
+            set logMe to "expirationDate: " & expirationDate
+            logToFile_(me)
+            updateMenuTitle_(daysUntilExpNice, expirationDate)
+        on error theError
+           errorOut_(theError, 1)
+        end try
+    end altGetExpiryDate_
 
     -- This is called when the domain is not accessible. It updates the menu display using data
     -- from the plist, which we assume was updated the last time the domain was accessible.
     on offlineUpdate_(sender)
         try
-            if onDomain is false
-                set logMe to "Using expireDateUnix: " & expireDateUnix
-                logToFile_(me)
-            end if
-            tell defaults to set tooltip to objectForKey_("tooltip") as string
-            set todayUnix to do shell script "/bin/date +%s"
-            set my daysUntilExp to ((expireDateUnix - todayUnix) / 86400)
-            set my daysUntilExpNice to round daysUntilExp rounding toward zero
-            updateMenuTitle_((daysUntilExpNice as string) & "d", tooltip)
-            set logMe to "daysUntilExp: " & daysUntilExp
+            tell defaults to set my expireDateUnix to objectForKey_("expireDateUnix") as string
+            set logMe to "Using expireDateUnix from plist: " & expireDateUnix
             logToFile_(me)
-            set my daysUntilExpNice to round daysUntilExp rounding toward zero
-            set logMe to "daysUntilExpNice: " & daysUntilExpNice
+            set my todayUnix to (do shell script "/bin/date +%s") as string
+            set logMe to "Today epoch: " & todayUnix
             logToFile_(me)
+            set my daysUntilExp to (expireDateUnix - todayUnix) / 86400
+            set logMe to "Offline daysUntilExp: " & daysUntilExp
+            logToFile_(me)
+            set my daysUntilExpNice to round daysUntilExp rounding down
+            set logMe to "Offline daysUntilExpNice: " & daysUntilExpNice
+            logToFile_(me)
+            set my expirationDate to do shell script "/bin/date -r" & expireDateUnix
+            set logMe to "Offline expirationDate: " & expirationDate
+            logToFile_(me)
+            updateMenuTitle_(daysUntilExpNice, expirationDate)
         on error theError
             errorOut_(theError, 1)
         end try
     end offlineUpdate_
 
     -- Updates the menu's title and tooltip
-    on updateMenuTitle_(menu_title, tooltip)
-        tell defaults to setObject_forKey_(menu_title, "menu_title")
+    on updateMenuTitle_(daysUntilExpNice, expirationDate)
+        tell defaults to setObject_forKey_(daysUntilExpNice, "menu_title")
         tell defaults to setObject_forKey_(tooltip, "tooltip")
+        updateMenuTitle_((daysUntilExpNice as string) & "d", "Your password expires\n" & expirationDate)
+        set my theMessage to "Your password expires in " & daysUntilExpNice & " days\non " & expirationDate
+        set my isIdle to true
+        doNotify_(daysUntilExpNice)
         statusMenuController's updateDisplay()
     end updateMenuTitle_
 
@@ -923,6 +994,8 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         end if
         
         try
+            set logMe to "onDomain: " & onDomain
+            logToFile_(me)
             if my onDomain is true
                 theWindow's displayIfNeeded()
                 set my isIdle to false
@@ -934,8 +1007,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 if my expireDateUnix = 0 and my selectedMethod = 0
                     easyMethod_(me)
                     if my goEasy is false
-                        getSearchBase_(me)
-                        getExpireAge_(me)
+                        altMethod_(me)
                     end if
                 else
                     easyMethod_(me)
@@ -943,19 +1015,13 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 if my goEasy is true and my selectedMethod = 0
                     set logMe to "Using msDS method"
                     logToFile_(me)
-                    easyDate_(expireDateUnix)
+                    --easyDate_(expireDateUnix)
+                    altMethod_(me)
                 else
                     set logMe to "Using alt method"
                     logToFile_(me)
-                    getPwdSetDate_(me)
-                    offlineUpdate_(me)
+                    altMethod_(me)
                 end if
-
-                updateMenuTitle_((daysUntilExpNice as string) & "d", "Your password expires\n" & expirationDate)
-                set my theMessage to "Your password expires in " & daysUntilExpNice & " days\non " & expirationDate
-                set my isIdle to true
-                doNotify_(daysUntilExpNice)
-
             else
                 set logMe to "Offline. Updating menu…"
                 logToFile_(me)
@@ -1437,9 +1503,9 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
 
     -- Bound to Auto radio buttons and Manual text field in Prefs window
     on useManualMethod_(sender)
-        set logMe to "selectedMethod: " & sender's intValue()
-        logToFile_(me)
         if sender's intValue() is not 1 -- Auto sends value 1 (on), so Manual is selected
+            set logMe to "Manual expiration method..."
+            logToFile_(me)
             set my isHidden to true
             set my isManualEnabled to true
             set my selectedMethod to 1
@@ -1448,6 +1514,8 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             tell defaults to setObject_forKey_(manualExpireDays, "expireAge")
             doProcess_(me)
         else -- Auto is selected
+            set logMe to "Automatic expiration method..."
+            logToFile_(me)
             set my isHidden to false
             set my isManualEnabled to false
             set my selectedMethod to 0
@@ -1718,7 +1786,7 @@ Please choose your configuration options."
         notifySetup_(me)
         doSelectedBehaviourCheck_(me) -- Check for Selected Behaviour
         createMenu_(me)  -- build and display the status menu item
-        intervalDomainTest_(me)  -- test domain connectivity
+        doProcess_(me)
 
         -- Set a timer to check for domain connectivity every five minutes. (300)
         set my domainTimer to NSTimer's scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(300, me, "intervalDomainTest:", missing value, true)
