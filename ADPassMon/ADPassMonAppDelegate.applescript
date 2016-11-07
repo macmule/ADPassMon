@@ -910,8 +910,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 if my goEasy is true and my selectedMethod = 0
                     set logMe to "Using msDS method"
                     logToFile_(me)
-                    altMethod_(me)
-                    --easyDate_(expireDateUnix)
+                    easyDate_(expireDateUnix)
                 else
                     set logMe to "Using alt method"
                     logToFile_(me)
