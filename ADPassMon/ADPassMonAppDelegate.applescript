@@ -39,7 +39,8 @@ script ADPassMonAppDelegate
     property NSWorkspace :              class "NSWorkspace" -- for sleep notification
     property NSNumberFormatter :        class "NSNumberFormatter" -- for number formatting
     property NSLocale :                 class "NSLocale" -- for locale
-
+    property NSApp  : current application's class "NSApp"
+    
 --- Objects
     property standardUserDefaults : missing value
     property statusMenu :           missing value
@@ -48,7 +49,6 @@ script ADPassMonAppDelegate
     property defaults :             missing value -- for saved prefs
     property theMessage :           missing value -- for stats display in pref window
     property manualExpireDays :     missing value
-    property selectedMethod :       missing value
     property thePassword :          missing value
     property toggleNotifyButton :   missing value
     property processTimer :         missing value
@@ -88,6 +88,7 @@ If you do not know your keychain password, enter your new password in the New an
     property domain : missing value
     property numberFormatter : missing value
     property usLocale : missing value
+    property digResult : missing value
     
 --- Booleans
     property first_run :                true
@@ -149,6 +150,7 @@ If you do not know your keychain password, enter your new password in the New an
     property pwPolicyURLButtonTitle :   ""
     property pwPolicyURLButtonURL :     ""
     property pwPolicyURLButtonBrowser : ""
+    property selectedMethod :           true
 
 --- HANDLERS ---
 
@@ -399,8 +401,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                                             first_run:first_run, ¬
                                             runIfLocal:runIfLocal, ¬
                                             passExpires:passExpires, ¬
-                                            selectedMethod:0, ¬
-                                            isManualEnabled:isManualEnabled, ¬
+                                            selectedMethod:selectedMethod, ¬
                                             enableNotifications:enableNotifications, ¬
                                             passwordCheckInterval:passwordCheckInterval, ¬
                                             expireAge:expireAge, ¬
@@ -434,12 +435,13 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         tell defaults to set my runIfLocal to objectForKey_("runIfLocal") as boolean
         tell defaults to set my passExpires to objectForKey_("passExpires") as boolean
         tell defaults to set my selectedMethod to objectForKey_("selectedMethod") as integer
-        tell defaults to set my isManualEnabled to objectForKey_("isManualEnabled") as integer
+        --tell defaults to set my isManualEnabled to objectForKey_("isManualEnabled") as integer isManualEnabled:isManualEnabled, ¬
+        
         tell defaults to set my enableNotifications to objectForKey_("enableNotifications") as integer
         tell defaults to set my passwordCheckInterval to objectForKey_("passwordCheckInterval") as integer
         tell defaults to set my expireAge to objectForKey_("expireAge") as integer
         tell defaults to set my expireDateUnix to objectForKey_("expireDateUnix")
-        tell defaults to set my pwdSetDate to objectForKey_("pwdSetDate") as integer
+        --tell defaults to set my pwdSetDate to objectForKey_("pwdSetDate") as integer
         tell defaults to set my warningDays to objectForKey_("warningDays")
         tell defaults to set my prefsLocked to objectForKey_("prefsLocked")
         tell defaults to set my pwPolicy to objectForKey_("pwPolicy")
@@ -524,23 +526,25 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
 
     -- Test to see if we're on the domain
     on domainTest_(sender)
-        -- Grab domain name from bind information
-        set domain to (do shell script "/usr/sbin/dsconfigad -show | /usr/bin/awk '/Active Directory Domain/{print $NF}'") as text
         -- Test domain connectivity
         try
-            set digResult to (do shell script "/usr/bin/dig +time=2 +tries=1 -t srv _ldap._tcp." & domain) as text
+            set my digResult to (do shell script "/usr/bin/dig +time=2 +tries=1 -t srv _ldap._tcp." & domain) as text
+            set my onDomain to true
+            set logMe to "Domain test succeeded."
+            logToFile_(me)
+            my statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(1)
+            my statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(1)
         on error
             set logMe to "Domain test timed out."
             logToFile_(me)
             set my onDomain to false
             my statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(0)
             my statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(0)
-            return
         end try
         -- For UI update
         delay 0.1
         -- If the get an answer from the above dig command
-        if "ANSWER SECTION" is in digResult
+        if "ANSWER SECTION" is in digResult and my onDomain is true
             if my onDomain is false
                 set my onDomain to true
                 set my freshDomain to true
@@ -562,11 +566,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 my statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(1)
             end if
         else
-            set my onDomain to false
-            set logMe to "Domain not reachable."
-            logToFile_(me)
-            my statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(0)
-            my statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(0)
+            offlineUpdate_(me)
         end if
 
         -- Run this section only if the domain just became reachable.
@@ -575,7 +575,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             -- If password can expire
             if passExpires
                 -- if we're using Auto and we don't have the password expiration age, check for kerberos ticket
-                if my expireDateUnix = 0 and my selectedMethod = 0
+                if my expireDateUnix = 0 and selectedMethod = 0
                     doKerbCheck_(me)
                     if first_run -- only display prefs window if running for first time
                         if prefsLocked as integer is equal to 0 -- only display the window if prefs are not locked
@@ -590,18 +590,19 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 else if my selectedMethod is 1
                     set my manualExpireDays to expireAge
                     set my isHidden to true
-                    set my isManualEnabled to true
+                    --set my isManualEnabled to true
                     doProcess_(me)
                 else if my selectedMethod is 0
                     set my isHidden to false
                     set my isManualEnabled to false
-                    set my manualExpireDays to ""
+                    --set my manualExpireDays to ""
                     doProcess_(me)
                 end if
                 watchForWake_(me)
             else
                 set logMe to "Stopping."
                 logToFile_(me)
+                quit
             end if
         end if
     end domainTest_
@@ -729,17 +730,14 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         end try
     end getADLDAP_
 
-    -- Use ldapsearch to get search base if OriginalNodeName method didn't work
+    -- Use ldapsearch to get search base
     on getSearchBase_(sender)
-        if (count of words of my mySearchBase) > 0
-            return
-        end if
         try
             set my mySearchBase to (do shell script "/usr/bin/ldapsearch -LLL -Q -s base -H ldap://" & myLDAP & " defaultNamingContext | /usr/bin/awk '/defaultNamingContext/{print $2}'") as text
                 set logMe to "mySearchBase: " & mySearchBase
                 logToFile_(me)
         on error theError
-            errorOut_(theError, 1)
+            errorOut_(theError)
         end try
     end getSearchBase_
 
@@ -760,56 +758,6 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             errorOut_(theError, 1)
         end try
     end getExpireAge_
-
-    -- Determine when the password was last changed
-    on getPwdSetDate_(sender)
-        -- Try & get last set date via dscl, if nothing returned, try via ldap
-        set my pwdSetDateUnix to (do shell script "/usr/bin/dscl localhost read /Search/Users/" & quoted form of userName & " SMBPasswordLastSet | /usr/bin/awk '/LastSet:/{print $2}'")
-        if (count words of pwdSetDateUnix) is equal to 0
-            set my pwdSetDateUnix to (do shell script "/usr/bin/ldapsearch -LLLL -Q -H ldap://" & myLDAP & " -b " & mySearchBase & " -s sub \"sAMAccountName=" & quoted form of userName & "\" pwdLastSet | /usr/bin/awk '/pwdLastSet:/{print $2}'")
-            set logMe to "pwdSetDateUnix via LDAP: " & pwdSetDateUnix
-            logToFile_(me)
-        else
-            set logMe to "pwdSetDateUnix via DSCL: " & last word of pwdSetDateUnix
-            logToFile_(me)
-        end if
-        if (count words of pwdSetDateUnix) is greater than 0
-            set my pwdSetDateUnix to last word of pwdSetDateUnix
-            set my pwdSetDateUnix to ((pwdSetDateUnix as integer) / 10000000 - 11644473600)
-            set my pwdSetDate to numberFormatter's stringFromNumber_(pwdSetDateUnix / 86400)
-        else if (count words of pwdSetDateUnix) is equal to 0
-            set my pwdSetDate to -1
-        end if
-        set logMe to "New pwdSetDate (" & pwdSetDate & ")"
-        logToFile_(me)
-        -- Now we compare the plist's value for pwdSetDate to the one we just calculated so
-        -- we avoid using an old or bad value (i.e. when SMBPasswordLastSet can't be found by dscl)
-        --tell defaults to set plistPwdSetDate to objectForKey_("pwdSetDate") as real
-        statusMenu's setAutoenablesItems_(false)
-        if plistPwdSetDate is equal to 0
-            set my skipKerb to true
-            log "Cannot get pwdSetDate"
-            tell defaults to setObject_forKey_(pwdSetDate, "pwdSetDate")
-            statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(not skipKerb)
-            statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(not skipKerb)
-        else if plistPwdSetDate is less than or equal to pwdSetDate
-            set logMe to "pwdSetDate ≥ plist value (" & plistPwdSetDate & ") so we use it"
-            logToFile_(me)
-            tell defaults to setObject_forKey_(pwdSetDate, "pwdSetDate")
-            -- If we can get a valid pwdSetDate, then we're on the network, so enable kerb features
-            set my skipKerb to false
-            statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(not skipKerb)
-            statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(not skipKerb)
-        else if plistPwdSetDate is greater than pwdSetDate
-            set logMe to "pwdSetDate < plist value (" & plistPwdSetDate & ") so we ignore it"
-            logToFile_(me)
-            set my pwdSetDate to plistPwdSetDate
-             -- If we can't get a valid pwdSetDate, then we're off the network, so disable kerb features
-            set my skipKerb to true
-            statusMenu's itemWithTitle_("Refresh Kerberos Ticket")'s setEnabled_(not skipKerb)
-            statusMenu's itemWithTitle_("Change Password…")'s setEnabled_(not skipKerb)
-        end if
-    end getPwdSetDate_
 
     -- Uses 'msDS-UserPasswordExpiryTimeComputed' value from AD to get expiration date.
     on easyMethod_(sender)
@@ -852,7 +800,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
     on altMethod_(sender)
         getSearchBase_(me)
         -- If we're set to Automatic discovery
-        if selectedMethod is 0
+        if my selectedMethod is 0
             getExpireAge_(me)
         end if
         set my pwdSetDateUnix to (do shell script "/usr/bin/dscl localhost read /Search/Users/" & quoted form of userName & " SMBPasswordLastSet | /usr/bin/awk '/LastSet:/{print $2}'")
@@ -869,7 +817,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             logToFile_(me)
         else
             set my pwdSetDateUnix to last word of pwdSetDateUnix
-            set my pwdSetDateUnix to ((pwdSetDateUnix as integer) / 10000000 - 11644473600)
+            set my pwdSetDateUnix to ((pwdSetDateUnix / 10000000) - 11644473600)
             set my pwdSetDate to numberFormatter's stringFromNumber_(pwdSetDateUnix)
             set logMe to "pwdSetDate epoch: " & pwdSetDate
             logToFile_(me)
@@ -911,6 +859,8 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
     -- This is called when the domain is not accessible. It updates the menu display using data
     -- from the plist, which we assume was updated the last time the domain was accessible.
     on offlineUpdate_(sender)
+        set logMe to "Offline. Updating menu…"
+        logToFile_(me)
         try
             tell defaults to set my expireDateUnix to objectForKey_("expireDateUnix") as string
             set logMe to "Using expireDateUnix from plist: " & expireDateUnix
@@ -936,29 +886,26 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         tell defaults to setObject_forKey_((daysUntilExpNice as string) & "d", "menu_title")
         tell defaults to setObject_forKey_("Your password expires on:\n" & expirationDate, "tooltip")
         set my isIdle to true
+        set my theMessage to "Your password expires in " & daysUntilExpNice & " days\non " & expirationDate
         doNotify_(daysUntilExpNice)
         statusMenuController's updateDisplay()
     end updateMenuTitle_
 
     -- The meat of the app; gets the data and does the calculations 
     on doProcess_(sender)
-        domainTest_(me)
-        if selectedMethod = 0
+        if my selectedMethod = 0
             set logMe to "Starting auto process…"
             logToFile_(me)
         else
             set logMe to "Starting manual process…"
             logToFile_(me)
         end if
-        
+        domainTest_(me)
         try
-            set logMe to "onDomain: " & onDomain
-            logToFile_(me)
             if my onDomain is true
                 theWindow's displayIfNeeded()
-                set my isIdle to false
                 set my theMessage to "Working…"
-                set logMe to theMessage
+                set my isIdle to false
                 logToFile_(me)
                 getADLDAP_(me)
                 -- Do this if we haven't run before, or the defaults have been reset.
@@ -979,10 +926,6 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                     logToFile_(me)
                     altMethod_(me)
                 end if
-            else
-                set logMe to "Offline. Updating menu…"
-                logToFile_(me)
-                offlineUpdate_(me)
             end if
         on error theError
             errorOut_(theError, 1)
@@ -1001,6 +944,10 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
     on intervalDoProcess_(sender)
         doProcess_(me)
     end intervalDoProcess_
+
+    on intervalDomainTest_(sender)
+        domainTest_(me)
+    end intervalDomainTest_
 
 --- INTERFACE BINDING HANDLERS ---
 
@@ -1464,7 +1411,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             set logMe to "Manual expiration method..."
             logToFile_(me)
             set my isHidden to true
-            set my isManualEnabled to true
+            --set my isManualEnabled to true
             set my selectedMethod to 1
             set my expireAge to manualExpireDays as integer
             tell defaults to setObject_forKey_(1, "selectedMethod")
@@ -1474,7 +1421,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             set logMe to "Automatic expiration method..."
             logToFile_(me)
             set my isHidden to false
-            set my isManualEnabled to false
+            --set my isManualEnabled to false
             set my selectedMethod to 0
             set my expireAge to ""
             set my manualExpireDays to ""
@@ -1745,8 +1692,8 @@ Please choose your configuration options."
         createMenu_(me)  -- build and display the status menu item
         doProcess_(me)
 
-        -- Set a timer to check for domain connectivity every five minutes. (300)
-        set my domainTimer to NSTimer's scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(300, me, "domainTest:", missing value, true)
+        -- Set a timer to check for domain connectivity every ten minutes. (600)
+        set my domainTimer to NSTimer's scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(600, me, "intervalDomainTest:", missing value, true)
 
         -- Set a timer to trigger doProcess handler on an interval and spawn notifications (if enabled).
         set my processTimer to NSTimer's scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_((my passwordCheckInterval * 3600), me, "intervalDoProcess:", missing value, true)
@@ -1771,15 +1718,8 @@ Please choose your configuration options."
         set logNewLine to false
     end logToFile_
 
-    -- Do processes necessary for app initiation, but check if account is local first
-    -- so we can break out if necessary
-    on applicationWillFinishLaunching_(sender)
-        set logMe to "Launching....."
-        logToFile_(me)
-        logVersion_(me)
-        getOS_(me)
-        getUserName_(me)
-        -- To try & correct decimal mark issues
+    -- To try & correct decimal mark issues
+    on setupNumberFormatter_(sender)
         set numberFormatter to NSNumberFormatter's alloc()'s init()
         set usLocale to NSLocale's alloc()'s initWithLocaleIdentifier_("en_US")
         numberFormatter's setUsesSignificantDigits_(true)
@@ -1789,27 +1729,54 @@ Please choose your configuration options."
         numberFormatter's setNumberStyle:(current application's NSNumberFormatterNoStyle)
         set logMe to "Set number formatter"
         logToFile_(me)
-        regDefaults_(me) -- populate plist file with defaults (will not overwrite non-default settings))
-        retrieveDefaults_(me) -- load defaults (from plist)
-        localAccountStatus_(me)
-        if my accountStatus is "Network" or accountStatus is "Cached" then
+    end setupNumberFormatter_
+
+    on checkBound_(sender)
+        -- Grab domain name from bind information, if bound
+        set domain to (do shell script "/usr/sbin/dsconfigad -show | /usr/bin/awk '/Active Directory Domain/{print $NF}'") as text
+    end checkBound_
+
+    -- Do processes necessary for app initiation, but check if account is local first
+    -- so we can break out if necessary
+    on applicationWillFinishLaunching_(sender)
+        set logMe to "Launching....."
+        logToFile_(me) -- Logging function
+        logVersion_(me) -- Log version of ADPassMon, including build
+        getOS_(me) -- Get OS version of the mac running ADPassMon
+        getUserName_(me) -- Get username, this includes those with spaces in the username
+        setupNumberFormatter_(me) -- Remove formatting, for different decimal marks
+        regDefaults_(me) -- Populate plist file with defaults (will not overwrite non-default settings))
+        retrieveDefaults_(me) -- Load defaults (from plist)
+        checkBound_(me) -- Check to see if we're bound. Exit if not.
+        localAccountStatus_(me) -- Get account details
+        -- quit if not bound, else proceed with account check
+        if domain is equal to "" then
+            set logMe to "Not bound, quitting..."
+            logToFile_(me)
+            quit
+        -- if a "standard" AD setup
+        else if my accountStatus is "Network" or accountStatus is "Cached" then
             startMeUp_(me)
+        -- If a local account, but same username in AD found if runIfLocal set to true
         else if my accountStatus is "Matched" and my runIfLocal is true then
-            set logMe to "Proceeding due to manual override."
+            set logMe to "Proceeding due to local account manual override."
             logToFile_(me)
             startMeUp_(me)
+        -- If a local account, but if runIfLocal set to false
         else if my accountStatus is "Matched" and my runIfLocal is false then
-            set logMe to "Manual override not enabled."
+            set logMe to "Local account manual override not enabled (runIfLocal)..."
             logToFile_(me)
-            set logMe to "Stopping."
-            logToFile_(me)
+            quit
+        -- If something else happened
         else
-            set logMe to "Stopping."
+            set logMe to "Something went wrong with account status check..."
             logToFile_(me)
+            quit
         end if
     end applicationWillFinishLaunching_
 
     on applicationShouldTerminate_(sender)
+        -- Terminate app
         return current application's NSTerminateNow
     end applicationShouldTerminate_
 

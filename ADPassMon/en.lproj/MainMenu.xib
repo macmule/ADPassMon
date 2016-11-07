@@ -1,8 +1,8 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="8191" systemVersion="14F27" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none">
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="11201" systemVersion="16B2555" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none">
     <dependencies>
         <deployment identifier="macosx"/>
-        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="8191"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="11201"/>
     </dependencies>
     <objects>
         <customObject id="-2" userLabel="File's Owner" customClass="NSApplication">
@@ -52,31 +52,11 @@
                                                 <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
                                             </textFieldCell>
                                         </textField>
-                                        <textField toolTip="Enter maximum password age, in days" verticalHuggingPriority="750" id="941">
-                                            <rect key="frame" x="256" y="260" width="50" height="22"/>
-                                            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
-                                            <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" enabled="NO" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" placeholderString="days" drawsBackground="YES" id="953">
-                                                <numberFormatter key="formatter" formatterBehavior="custom10_4" positiveFormat="#,##1.###" negativeFormat="#,##1.###" numberStyle="decimal" allowsFloats="NO" paddingCharacter="*" roundingMode="halfUp" minimumIntegerDigits="1" maximumIntegerDigits="3" maximumFractionDigits="3" decimalSeparator="." groupingSeparator="," currencyDecimalSeparator="." plusSign="+" minusSign="-" notANumberSymbol="NaN" perMillSymbol="‰" percentSymbol="%" exponentSymbol="E" positivePrefix="" positiveSuffix="" negativePrefix="-" negativeSuffix="" id="954">
-                                                    <real key="multiplier" value="1"/>
-                                                    <real key="roundingIncrement" value="1"/>
-                                                    <real key="minimum" value="2"/>
-                                                    <real key="maximum" value="999"/>
-                                                </numberFormatter>
-                                                <font key="font" metaFont="system"/>
-                                                <color key="textColor" name="textColor" catalog="System" colorSpace="catalog"/>
-                                                <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
-                                            </textFieldCell>
-                                            <connections>
-                                                <action selector="useManualMethod:" target="494" id="976"/>
-                                                <binding destination="494" name="enabled" keyPath="isManualEnabled" id="971"/>
-                                                <binding destination="494" name="value" keyPath="manualExpireDays" id="963"/>
-                                            </connections>
-                                        </textField>
                                         <matrix verticalHuggingPriority="750" allowsEmptySelection="NO" id="939">
-                                            <rect key="frame" x="29" y="262" width="270" height="18"/>
+                                            <rect key="frame" x="29" y="262" width="230" height="18"/>
                                             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
                                             <color key="backgroundColor" name="controlColor" catalog="System" colorSpace="catalog"/>
-                                            <size key="cellSize" width="112" height="18"/>
+                                            <size key="cellSize" width="92" height="18"/>
                                             <size key="intercellSpacing" width="46" height="2"/>
                                             <buttonCell key="prototype" type="radio" title="Radio" imagePosition="left" alignment="left" tag="3" inset="2" id="958">
                                                 <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
@@ -89,11 +69,6 @@
                                                         <font key="font" metaFont="system"/>
                                                         <connections>
                                                             <action selector="useManualMethod:" target="494" id="975"/>
-                                                            <binding destination="494" name="value" keyPath="isManualEnabled" id="962">
-                                                                <dictionary key="options">
-                                                                    <string key="NSValueTransformerName">NSNegateBoolean</string>
-                                                                </dictionary>
-                                                            </binding>
                                                         </connections>
                                                     </buttonCell>
                                                 </column>
@@ -103,7 +78,6 @@
                                                         <font key="font" metaFont="system"/>
                                                         <connections>
                                                             <action selector="selectText:" target="941" id="960"/>
-                                                            <binding destination="494" name="value" keyPath="isManualEnabled" id="968"/>
                                                         </connections>
                                                     </buttonCell>
                                                 </column>
@@ -279,6 +253,24 @@
                                                 <binding destination="494" name="enabled" keyPath="allowPasswordChange" id="j7m-wH-7Nt"/>
                                             </connections>
                                         </matrix>
+                                        <textField toolTip="Enter maximum password age, in days" verticalHuggingPriority="750" id="941">
+                                            <rect key="frame" x="256" y="260" width="50" height="22"/>
+                                            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                                            <textFieldCell key="cell" scrollable="YES" lineBreakMode="clipping" selectable="YES" editable="YES" enabled="NO" sendsActionOnEndEditing="YES" state="on" borderStyle="bezel" placeholderString="days" drawsBackground="YES" id="953">
+                                                <numberFormatter key="formatter" formatterBehavior="custom10_4" positiveFormat="#,##1.###" negativeFormat="#,##1.###" numberStyle="decimal" allowsFloats="NO" paddingCharacter="*" roundingMode="halfUp" minimumIntegerDigits="1" maximumIntegerDigits="3" maximumFractionDigits="3" decimalSeparator="." groupingSeparator="," currencyDecimalSeparator="." plusSign="+" minusSign="-" notANumberSymbol="NaN" perMillSymbol="‰" percentSymbol="%" exponentSymbol="E" positivePrefix="" positiveSuffix="" negativePrefix="-" negativeSuffix="" id="954">
+                                                    <real key="multiplier" value="1"/>
+                                                    <real key="roundingIncrement" value="1"/>
+                                                    <real key="minimum" value="2"/>
+                                                    <real key="maximum" value="999"/>
+                                                </numberFormatter>
+                                                <font key="font" metaFont="system"/>
+                                                <color key="textColor" name="textColor" catalog="System" colorSpace="catalog"/>
+                                                <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                                            </textFieldCell>
+                                            <connections>
+                                                <action selector="useManualMethod:" target="494" id="976"/>
+                                            </connections>
+                                        </textField>
                                     </subviews>
                                 </view>
                             </tabViewItem>

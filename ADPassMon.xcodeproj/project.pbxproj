@@ -16,9 +16,9 @@
 		391FC4F21361276900D2E33C /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 391FC4F11361276900D2E33C /* README.md */; };
 		39925B9F133CE6E8001C9566 /* LaunchAtLoginController.m in Sources */ = {isa = PBXBuildFile; fileRef = 39925B9E133CE6E8001C9566 /* LaunchAtLoginController.m */; };
 		39952F35133BAD5800A8DD42 /* StatusMenuController.m in Sources */ = {isa = PBXBuildFile; fileRef = 39952F34133BAD5800A8DD42 /* StatusMenuController.m */; };
-		39D5363D1BB0744400D64989 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 39D5363B1BB0744400D64989 /* MainMenu.xib */; };
 		39DC46FB1B6A6DF000AABB81 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 39DC46FA1B6A6DF000AABB81 /* Images.xcassets */; };
 		7C36C8481B9837C100D56827 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 7C36C8471B9837C100D56827 /* AppIcon.icns */; };
+		7C9223841DD11DC600236F1C /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 39D5363B1BB0744400D64989 /* MainMenu.xib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -195,12 +195,12 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7C9223841DD11DC600236F1C /* MainMenu.xib in Resources */,
 				39094F301338DBE4007821C2 /* InfoPlist.strings in Resources */,
 				39094F361338DBE4007821C2 /* Credits.rtf in Resources */,
 				7C36C8481B9837C100D56827 /* AppIcon.icns in Resources */,
 				39DC46FB1B6A6DF000AABB81 /* Images.xcassets in Resources */,
 				391FC4F21361276900D2E33C /* README.md in Resources */,
-				39D5363D1BB0744400D64989 /* MainMenu.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
