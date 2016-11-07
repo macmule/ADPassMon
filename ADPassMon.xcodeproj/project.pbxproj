@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 48;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -18,7 +18,7 @@
 		39952F35133BAD5800A8DD42 /* StatusMenuController.m in Sources */ = {isa = PBXBuildFile; fileRef = 39952F34133BAD5800A8DD42 /* StatusMenuController.m */; };
 		39DC46FB1B6A6DF000AABB81 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 39DC46FA1B6A6DF000AABB81 /* Images.xcassets */; };
 		7C36C8481B9837C100D56827 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 7C36C8471B9837C100D56827 /* AppIcon.icns */; };
-		7C9223841DD11DC600236F1C /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 39D5363B1BB0744400D64989 /* MainMenu.xib */; };
+		7C9E17D81DD129300055FAE1 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 7C9E17D71DD129300055FAE1 /* MainMenu.xib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -51,9 +51,9 @@
 		39925B9E133CE6E8001C9566 /* LaunchAtLoginController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = LaunchAtLoginController.m; sourceTree = "<group>"; };
 		39952F33133BAD5800A8DD42 /* StatusMenuController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StatusMenuController.h; sourceTree = "<group>"; };
 		39952F34133BAD5800A8DD42 /* StatusMenuController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = StatusMenuController.m; sourceTree = "<group>"; };
-		39D5363C1BB0744400D64989 /* en */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = en; path = en.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		39DC46FA1B6A6DF000AABB81 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
 		7C36C8471B9837C100D56827 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
+		7C9E17D71DD129300055FAE1 /* MainMenu.xib */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.xib; path = MainMenu.xib; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,7 +111,6 @@
 		39094F2B1338DBE4007821C2 /* ADPassMon */ = {
 			isa = PBXGroup;
 			children = (
-				39D5363B1BB0744400D64989 /* MainMenu.xib */,
 				39DC46FA1B6A6DF000AABB81 /* Images.xcassets */,
 				39094F2C1338DBE4007821C2 /* Supporting Files */,
 			);
@@ -121,6 +120,7 @@
 		39094F2C1338DBE4007821C2 /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
+				7C9E17D71DD129300055FAE1 /* MainMenu.xib */,
 				7C36C8471B9837C100D56827 /* AppIcon.icns */,
 				39094F2D1338DBE4007821C2 /* ADPassMon-Info.plist */,
 				39094F2E1338DBE4007821C2 /* InfoPlist.strings */,
@@ -174,7 +174,7 @@
 				LastUpgradeCheck = 0800;
 			};
 			buildConfigurationList = 39094F191338DBE4007821C2 /* Build configuration list for PBXProject "ADPassMon" */;
-			compatibilityVersion = "Xcode 3.2";
+			compatibilityVersion = "Xcode 8.0";
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -195,12 +195,12 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7C9223841DD11DC600236F1C /* MainMenu.xib in Resources */,
 				39094F301338DBE4007821C2 /* InfoPlist.strings in Resources */,
 				39094F361338DBE4007821C2 /* Credits.rtf in Resources */,
 				7C36C8481B9837C100D56827 /* AppIcon.icns in Resources */,
 				39DC46FB1B6A6DF000AABB81 /* Images.xcassets in Resources */,
 				391FC4F21361276900D2E33C /* README.md in Resources */,
+				7C9E17D81DD129300055FAE1 /* MainMenu.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -251,14 +251,6 @@
 				39094F351338DBE4007821C2 /* en */,
 			);
 			name = Credits.rtf;
-			sourceTree = "<group>";
-		};
-		39D5363B1BB0744400D64989 /* MainMenu.xib */ = {
-			isa = PBXVariantGroup;
-			children = (
-				39D5363C1BB0744400D64989 /* en */,
-			);
-			name = MainMenu.xib;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */
@@ -346,6 +338,7 @@
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ADPassMon/ADPassMon-Prefix.pch";
+				GENERATE_PKGINFO_FILE = NO;
 				INFOPLIST_FILE = "ADPassMon/ADPassMon-Info.plist";
 				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				ONLY_ACTIVE_ARCH = YES;
@@ -371,6 +364,7 @@
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "ADPassMon/ADPassMon-Prefix.pch";
+				GENERATE_PKGINFO_FILE = NO;
 				INFOPLIST_FILE = "ADPassMon/ADPassMon-Info.plist";
 				MACOSX_DEPLOYMENT_TARGET = 10.8;
 				ONLY_ACTIVE_ARCH = YES;

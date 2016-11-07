@@ -48,7 +48,6 @@ script ADPassMonAppDelegate
     property theWindow :            missing value
     property defaults :             missing value -- for saved prefs
     property theMessage :           missing value -- for stats display in pref window
-    property manualExpireDays :     missing value
     property thePassword :          missing value
     property toggleNotifyButton :   missing value
     property processTimer :         missing value
@@ -84,18 +83,17 @@ If you do not know your keychain password, enter your new password in the New an
     property appVersion : missing value
     property buildVersion : missing value
     property userName : missing value
-    property fmt : missing value
     property domain : missing value
     property numberFormatter : missing value
     property usLocale : missing value
     property digResult : missing value
+    property manualExpireDays : missing value
     
 --- Booleans
     property first_run :                true
     property runIfLocal :               false
     property isIdle :                   true
     property isHidden :                 false
-    property isManualEnabled :          false
     property enableNotifications :      true
     property enableKerbMinder :         false
     property prefsLocked :              false
@@ -127,7 +125,7 @@ If you do not know your keychain password, enter your new password in the New an
     property kerb :                     ""
     property myLDAP :                   ""
     property mySearchBase :             ""
-    property expireAge :                0
+    property expireAge :                60
     property expireAgeUnix :            ""
     property expireDate:                ""
     property expireDateUnix:            ""
@@ -150,7 +148,7 @@ If you do not know your keychain password, enter your new password in the New an
     property pwPolicyURLButtonTitle :   ""
     property pwPolicyURLButtonURL :     ""
     property pwPolicyURLButtonBrowser : ""
-    property selectedMethod :           true
+    property selectedMethod :           0
 
 --- HANDLERS ---
 
@@ -401,12 +399,11 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                                             first_run:first_run, ¬
                                             runIfLocal:runIfLocal, ¬
                                             passExpires:passExpires, ¬
-                                            selectedMethod:selectedMethod, ¬
+                                            selectedMethod:0, ¬
                                             enableNotifications:enableNotifications, ¬
                                             passwordCheckInterval:passwordCheckInterval, ¬
                                             expireAge:expireAge, ¬
                                             expireDateUnix:expireDateUnix, ¬
-                                            pwdSetDate:pwdSetDate, ¬
                                             warningDays:warningDays, ¬
                                             prefsLocked:prefsLocked, ¬
                                             pwPolicy:pwPolicy, ¬
@@ -435,13 +432,10 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         tell defaults to set my runIfLocal to objectForKey_("runIfLocal") as boolean
         tell defaults to set my passExpires to objectForKey_("passExpires") as boolean
         tell defaults to set my selectedMethod to objectForKey_("selectedMethod") as integer
-        --tell defaults to set my isManualEnabled to objectForKey_("isManualEnabled") as integer isManualEnabled:isManualEnabled, ¬
-        
         tell defaults to set my enableNotifications to objectForKey_("enableNotifications") as integer
         tell defaults to set my passwordCheckInterval to objectForKey_("passwordCheckInterval") as integer
         tell defaults to set my expireAge to objectForKey_("expireAge") as integer
         tell defaults to set my expireDateUnix to objectForKey_("expireDateUnix")
-        --tell defaults to set my pwdSetDate to objectForKey_("pwdSetDate") as integer
         tell defaults to set my warningDays to objectForKey_("warningDays")
         tell defaults to set my prefsLocked to objectForKey_("prefsLocked")
         tell defaults to set my pwPolicy to objectForKey_("pwPolicy")
@@ -588,15 +582,9 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                         end if
                     end if
                 else if my selectedMethod is 1
-                    set my manualExpireDays to expireAge
-                    set my isHidden to true
-                    --set my isManualEnabled to true
-                    doProcess_(me)
-                else if my selectedMethod is 0
                     set my isHidden to false
-                    set my isManualEnabled to false
-                    --set my manualExpireDays to ""
-                    doProcess_(me)
+                else if my selectedMethod is 0
+                    set my isHidden to true
                 end if
                 watchForWake_(me)
             else
@@ -896,9 +884,11 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         if my selectedMethod = 0
             set logMe to "Starting auto process…"
             logToFile_(me)
+            set my isHidden to true
         else
             set logMe to "Starting manual process…"
             logToFile_(me)
+            set my isHidden to false
         end if
         domainTest_(me)
         try
@@ -920,7 +910,8 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 if my goEasy is true and my selectedMethod = 0
                     set logMe to "Using msDS method"
                     logToFile_(me)
-                    easyDate_(expireDateUnix)
+                    altMethod_(me)
+                    --easyDate_(expireDateUnix)
                 else
                     set logMe to "Using alt method"
                     logToFile_(me)
@@ -1406,32 +1397,41 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
     end quit_
 
     -- Bound to Auto radio buttons and Manual text field in Prefs window
+    on useAutoMethod_(sender)
+        set logMe to "Automatic expiration method..."
+        logToFile_(me)
+        set my isHidden to true
+        set my selectedMethod to 0
+        set my expireAge to ""
+        tell defaults to removeObjectForKey_("expireAge")
+        tell defaults to removeObjectForKey_("expireDateUnix")
+        tell defaults to setObject:0 forKey:"selectedMethod"
+        doProcess_(me)
+    end useAutoMethod_
+
+    -- Bound to Auto radio buttons and Manual text field in Prefs window
     on useManualMethod_(sender)
-        if sender's intValue() is not 1 -- Auto sends value 1 (on), so Manual is selected
-            set logMe to "Manual expiration method..."
-            logToFile_(me)
-            set my isHidden to true
-            --set my isManualEnabled to true
-            set my selectedMethod to 1
-            set my expireAge to manualExpireDays as integer
-            tell defaults to setObject_forKey_(1, "selectedMethod")
-            tell defaults to setObject_forKey_(manualExpireDays, "expireAge")
-            doProcess_(me)
-        else -- Auto is selected
-            set logMe to "Automatic expiration method..."
-            logToFile_(me)
-            set my isHidden to false
-            --set my isManualEnabled to false
-            set my selectedMethod to 0
-            set my expireAge to ""
-            set my manualExpireDays to ""
-            tell defaults to removeObjectForKey_("expireAge")
-            tell defaults to removeObjectForKey_("expireDateUnix")
-            tell defaults to setObject_forKey_(0, "selectedMethod")
-            tell defaults to setObject_forKey_("", "expireAge")
-            doKerbCheck_(me)
-        end if
+        set logMe to "Manual expiration method..."
+        logToFile_(me)
+        set my isHidden to false
+        set my selectedMethod to 1
+        tell defaults to set my expireAge to objectForKey_("expireAge") as integer
+        tell defaults to setObject:1 forKey:"selectedMethod"
+        tell defaults to setObject_forKey_(expireAge, "expireAge")
+        doProcess_(me)
     end useManualMethod_
+
+    -- Look for changes to text field, update as needed.
+    on controlTextDidChange_(aNotification)
+        set logMe to "whoop!"
+        logToFile_(me)
+        if aNotification's object() is manualExpireDays() then
+            set expireAge to manualExpireDays's intValue()
+            set logMe to "Manually set expire age to: " & expireAge
+            logToFile_(me)
+            doProcess_(me)
+        end if
+    end controlTextDidChange_
 
     -- Bound to Version 1 radio button on the Prefs window
     on useBehaviour1_(sender)
