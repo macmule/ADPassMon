@@ -95,7 +95,6 @@ If you do not know your keychain password, enter your new password in the New an
     property isIdle :                   true
     property isHidden :                 false
     property enableNotifications :      true
-    property enableKerbMinder :         false
     property prefsLocked :              false
     property launchAtLogin :            false
     property skipKerb :                 false
@@ -104,7 +103,6 @@ If you do not know your keychain password, enter your new password in the New an
     property passExpires :              true
     property goEasy :                   false
     property showChangePass :           false
-    property KerbMinderInstalled :      false
     property enablePasswordPromptWindowButton2 : false
     property firstPasswordCheckPassed : true
     property userPasswordChanged :      false
@@ -375,19 +373,6 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             logToFile_(me)
         end if
     end doKeychainLockCheck_
-    
-    -- Check to see if KerbMinder installed
-    on KerbMinderTest_(sender)
-        tell application "Finder"
-            if exists "/Library/Application Support/crankd/KerbMinder.py" as POSIX file
-                set my KerbMinderInstalled to true
-                set logMe to "KerbMinder installed..."
-                logToFile_(me)
-            else
-                set my KerbMinderInstalled to false
-            end if
-        end tell
-    end KerbMinderTest_
 
     -- Register plist default settings
     on regDefaults_(sender)
@@ -409,7 +394,6 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                                             pwPolicy:pwPolicy, ¬
                                             pwPolicyButton:pwPolicyButton, ¬
                                             accTest:accTest, ¬
-                                            enableKerbMinder:enableKerbMinder, ¬
                                             launchAtLogin:launchAtLogin, ¬
                                             enableKeychainLockCheck:0, ¬
                                             selectedBehaviour:1, ¬
@@ -441,7 +425,6 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         tell defaults to set my pwPolicy to objectForKey_("pwPolicy")
         tell defaults to set my pwPolicyButton to objectForKey_("pwPolicyButton")
         tell defaults to set my accTest to objectForKey_("accTest") as integer
-        tell defaults to set my enableKerbMinder to objectForKey_("enableKerbMinder")
         tell defaults to set my launchAtLogin to objectForKey_("launchAtLogin")
         tell defaults to set my enableKeychainLockCheck to objectForKey_("enableKeychainLockCheck") as integer
         tell defaults to set my selectedBehaviour to objectForKey_ ("selectedBehaviour") as integer
@@ -605,7 +588,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         end if
         try
             if first character of uAC is "6"
-                set passExpires to false
+                set my passExpires to false
                 set logMe to "Password does not expire."
                 logToFile_(me)
                 my statusMenu's itemWithTitle_("Re-check Expiration")'s setEnabled_(passExpires as boolean)
@@ -616,6 +599,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 logToFile_(me)
             else
                 set logMe to "Password does expire."
+                tell defaults to removeObjectForKey_("passExpires")
                 logToFile_(me)
             end if
         on error
@@ -781,7 +765,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         set my daysUntilExpNice to round daysUntilExp rounding down
         set logMe to "ms-DS daysUntilExpNice: " & daysUntilExpNice
         logToFile_(me)
-        updateMenuTitle_(daysUntilExpNice, expirationDate)
+        updateMenuTitle_((daysUntilExpNice as string) & "d", "Your password expires on:\n" & expirationDate)
     end easyDate_
 
     -- If ms-DS cannot be used, try via DSCL and if that fails LDAP
@@ -838,7 +822,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             set my expirationDate to do shell script "/bin/date -r" & expireDateUnix
             set logMe to "expirationDate: " & expirationDate
             logToFile_(me)
-            updateMenuTitle_(daysUntilExpNice, expirationDate)
+            updateMenuTitle_((daysUntilExpNice as string) & "d", "Your password expires on:\n" & expirationDate)
         on error theError
            errorOut_(theError, 1)
         end try
@@ -865,61 +849,68 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             set my expirationDate to do shell script "/bin/date -r" & expireDateUnix
             set logMe to "Offline expirationDate: " & expirationDate
             logToFile_(me)
-            updateMenuTitle_(daysUntilExpNice, expirationDate)
+            updateMenuTitle_((daysUntilExpNice as string) & "d", "Your password expires on:\n" & expirationDate)
         end try
     end offlineUpdate_
 
     -- Updates the menu's title and tooltip
     on updateMenuTitle_(daysUntilExpNice, expirationDate)
-        tell defaults to setObject_forKey_((daysUntilExpNice as string) & "d", "menu_title")
-        tell defaults to setObject_forKey_("Your password expires on:\n" & expirationDate, "tooltip")
+        tell defaults to setObject_forKey_(daysUntilExpNice, "menu_title")
+        tell defaults to setObject_forKey_(expirationDate, "tooltip")
         set my isIdle to true
-        set my theMessage to "Your password expires in " & daysUntilExpNice & " days\non " & expirationDate
-        doNotify_(daysUntilExpNice)
+        -- Log a different message if pass expires & notify if within warning days
+        if passExpires
+            set my theMessage to "Your password expires in " & daysUntilExpNice & " days\non " & expirationDate
+            doNotify_(text 1 thru -2 of daysUntilExpNice)
+        end if
         statusMenuController's updateDisplay()
     end updateMenuTitle_
 
-    -- The meat of the app; gets the data and does the calculations 
+    -- The meat of the app; gets the data and does the calculations
     on doProcess_(sender)
-        if my selectedMethod = 0
-            set logMe to "Starting auto process…"
-            logToFile_(me)
-            set my isHidden to true
-        else
-            set logMe to "Starting manual process…"
-            logToFile_(me)
-            set my isHidden to false
-        end if
-        domainTest_(me)
-        try
-            if my onDomain is true
-                theWindow's displayIfNeeded()
-                set my theMessage to "Working…"
-                set my isIdle to false
+        canPassExpire_(me)
+        -- If password can expire
+        if passExpires
+            if my selectedMethod = 0
+                set logMe to "Starting auto process…"
                 logToFile_(me)
-                getADLDAP_(me)
-                -- Do this if we haven't run before, or the defaults have been reset.
-                if my expireDateUnix = 0 and my selectedMethod = 0
-                    easyMethod_(me)
-                    if my goEasy is false
+                set my isHidden to true
+            else
+                set logMe to "Starting manual process…"
+                logToFile_(me)
+                set my isHidden to false
+            end if
+            domainTest_(me)
+            try
+                if my onDomain is true
+                    theWindow's displayIfNeeded()
+                    set my theMessage to "Working…"
+                    set my isIdle to false
+                    logToFile_(me)
+                    getADLDAP_(me)
+                    -- Do this if we haven't run before, or the defaults have been reset.
+                    if my expireDateUnix = 0 and my selectedMethod = 0
+                        easyMethod_(me)
+                        if my goEasy is false
+                            altMethod_(me)
+                        end if
+                    else
+                        easyMethod_(me)
+                    end if
+                    if my goEasy is true and my selectedMethod = 0
+                        set logMe to "Using msDS method"
+                        logToFile_(me)
+                        easyDate_(expireDateUnix)
+                    else
+                        set logMe to "Using alt method"
+                        logToFile_(me)
                         altMethod_(me)
                     end if
-                else
-                    easyMethod_(me)
                 end if
-                if my goEasy is true and my selectedMethod = 0
-                    set logMe to "Using msDS method"
-                    logToFile_(me)
-                    easyDate_(expireDateUnix)
-                else
-                    set logMe to "Using alt method"
-                    logToFile_(me)
-                    altMethod_(me)
-                end if
-            end if
-        on error theError
-            errorOut_(theError, 1)
-        end try
+            on error theError
+                errorOut_(theError, 1)
+            end try
+        end if
         -- Check for Selected Behaviour
         doSelectedBehaviourCheck_(me)
         -- Check for Keychain Lock
@@ -1502,22 +1493,6 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             logToFile_(me)
         end if
     end toggleNotify_
-    
-    on toggleKerbMinder_(sender)
-        if my enableKerbMinder as boolean is true
-            set my enableKerbMinder to false
-            my statusMenu's itemWithTitle_("Use KerbMinder")'s setState_(0)
-            tell defaults to setObject_forKey_(enableKerbMinder, "enableKerbMinder")
-            set logMe to "Disabled KerbMinder."
-            logToFile_(me)
-        else
-            set my enableKerbMinder to true
-            my statusMenu's itemWithTitle_("Use KerbMinder")'s setState_(1)
-            tell defaults to setObject_forKey_(enableKerbMinder, "enableKerbMinder")
-            set logMe to "Enabled KerbMinder."
-            logToFile_(me)
-        end if
-    end toggleKerbMinder_
 
     -- Bound to Check Keychain items in menu and Prefs window
     on toggleKeychainLockCheck_(sender)
@@ -1569,8 +1544,6 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         tell defaults to removeObjectForKey_("pwPolicy")
         tell defaults to removeObjectForKey_("pwPolicyButton")
         tell defaults to removeObjectForKey_("accTest")
-        tell defaults to removeObjectForKey_("enableKerbMinder")
-        tell defaults to removeObjectForKey_("enableKerbMinder")
         tell defaults to removeObjectForKey_("enableKeychainLockCheck")
         tell defaults to removeObjectForKey_("selectedBehaviour")
         tell defaults to removeObjectForKey_("isBehaviour2Enabled")
@@ -1612,16 +1585,6 @@ Please choose your configuration options."
         menuItem's setAction_("toggleNotify:")
         menuItem's setEnabled_(true)
         menuItem's setState_(enableNotifications as integer)
-        statusMenu's addItem_(menuItem)
-        menuItem's release()
-        
-        set menuItem to (my NSMenuItem's alloc)'s init
-        menuItem's setTitle_("Use KerbMinder")
-        menuItem's setTarget_(me)
-        menuItem's setAction_("toggleKerbMinder:")
-        menuItem's setEnabled_(true)
-        menuItem's setHidden_(not KerbMinderInstalled)
-        menuItem's setState_(enableKerbMinder as integer)
         statusMenu's addItem_(menuItem)
         menuItem's release()
         
@@ -1685,7 +1648,6 @@ Please choose your configuration options."
 
     -- Do processes necessary for app initiation
     on startMeUp_(sender)
-        KerbMinderTest_(me)
         notifySetup_(me)
         doSelectedBehaviourCheck_(me) -- Check for Selected Behaviour
         createMenu_(me)  -- build and display the status menu item
