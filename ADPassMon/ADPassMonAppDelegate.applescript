@@ -765,7 +765,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         set my daysUntilExpNice to round daysUntilExp rounding down
         set logMe to "ms-DS daysUntilExpNice: " & daysUntilExpNice
         logToFile_(me)
-        updateMenuTitle_((daysUntilExpNice as string) & "d", expirationDate)
+        updateMenuTitle_((daysUntilExpNice as string), expirationDate)
     end easyDate_
 
     -- If ms-DS cannot be used, try via DSCL and if that fails LDAP
@@ -822,7 +822,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             set my expirationDate to do shell script "/bin/date -r" & expireDateUnix
             set logMe to "expirationDate: " & expirationDate
             logToFile_(me)
-            updateMenuTitle_((daysUntilExpNice as string) & "d",  expirationDate)
+            updateMenuTitle_((daysUntilExpNice as string), expirationDate)
         on error theError
            errorOut_(theError, 1)
         end try
@@ -849,20 +849,20 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             set my expirationDate to do shell script "/bin/date -r" & expireDateUnix
             set logMe to "Offline expirationDate: " & expirationDate
             logToFile_(me)
-            updateMenuTitle_((daysUntilExpNice as string) & "d",  expirationDate)
+            updateMenuTitle_((daysUntilExpNice as string), expirationDate)
         end try
     end offlineUpdate_
 
     -- Updates the menu's title and tooltip
     on updateMenuTitle_(daysUntilExpNice, expirationDate)
-        tell defaults to setObject_forKey_(daysUntilExpNice, "menu_title")
         set my isIdle to true
         -- Log a different message if pass expires & notify if within warning days
         if passExpires
+            tell defaults to setObject_forKey_(daysUntilExpNice & "d", "menu_title")
             set my theMessage to "Your password expires in " & daysUntilExpNice & " days\non " & expirationDate
             set my tooltip to "Your password expires on:\n" & expirationDate
             tell defaults to setObject_forKey_(expirationDate, "tooltip")
-            doNotify_(text 1 thru -2 of daysUntilExpNice)
+            doNotify_(daysUntilExpNice)
         end if
         statusMenuController's updateDisplay()
     end updateMenuTitle_
@@ -1418,7 +1418,6 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
 
     -- Look for changes to text field, update as needed.
     on controlTextDidChange_(aNotification)
-        set logMe to "whoop!"
         logToFile_(me)
         if aNotification's object() is manualExpireDays() then
             set expireAge to manualExpireDays's intValue()
