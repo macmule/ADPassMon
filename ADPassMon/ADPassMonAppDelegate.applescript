@@ -765,7 +765,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
         set my daysUntilExpNice to round daysUntilExp rounding down
         set logMe to "ms-DS daysUntilExpNice: " & daysUntilExpNice
         logToFile_(me)
-        updateMenuTitle_((daysUntilExpNice as string) & "d", "Your password expires on:\n" & expirationDate)
+        updateMenuTitle_((daysUntilExpNice as string) & "d", expirationDate)
     end easyDate_
 
     -- If ms-DS cannot be used, try via DSCL and if that fails LDAP
@@ -889,23 +889,27 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                     set my isIdle to false
                     logToFile_(me)
                     getADLDAP_(me)
-                    -- Do this if we haven't run before, or the defaults have been reset.
-                    if my expireDateUnix = 0 and my selectedMethod = 0
-                        easyMethod_(me)
-                        if my goEasy is false
+                    if my onDomain is true
+                        -- Do this if we haven't run before, or the defaults have been reset.
+                        if my expireDateUnix = 0 and my selectedMethod = 0
+                            easyMethod_(me)
+                            if my goEasy is false
+                                altMethod_(me)
+                            end if
+                        else
+                            easyMethod_(me)
+                        end if
+                        if my goEasy is true and my selectedMethod = 0
+                            set logMe to "Using msDS method"
+                            logToFile_(me)
+                            easyDate_(expireDateUnix)
+                        else
+                            set logMe to "Using alt method"
+                            logToFile_(me)
                             altMethod_(me)
                         end if
                     else
-                        easyMethod_(me)
-                    end if
-                    if my goEasy is true and my selectedMethod = 0
-                        set logMe to "Using msDS method"
-                        logToFile_(me)
-                        easyDate_(expireDateUnix)
-                    else
-                        set logMe to "Using alt method"
-                        logToFile_(me)
-                        altMethod_(me)
+                        offlineUpdate_(me)
                     end if
                 end if
             on error theError
