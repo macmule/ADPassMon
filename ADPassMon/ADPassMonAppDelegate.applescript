@@ -264,7 +264,7 @@ If you do not know your keychain password, enter your new password in the New an
                 end if
             else -- if we're running 10.9 or later, Accessibility is handled differently
                 tell defaults to set my accTest to objectForKey_("accTest")
-                if accTest as integer is 1
+                if my accTest as integer is 1
                     if "80" is in (do shell script "/usr/bin/id -G") -- checks if user is in admin group
                         set accessDialog to (display dialog "ADPassMon's \"Change Password\" feature requires assistive access to open the password panel.
                         
