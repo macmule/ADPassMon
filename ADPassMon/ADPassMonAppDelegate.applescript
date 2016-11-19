@@ -263,7 +263,7 @@ If you do not know your keychain password, enter your new password in the New an
                     accEnable_(me)
                 end if
             else -- if we're running 10.9 or later, Accessibility is handled differently
-                tell defaults to set my accTest to objectForKey_("accTest")
+                --tell defaults to set my accTest to objectForKey_("accTest")
                 if my accTest as integer is 1
                     if "80" is in (do shell script "/usr/bin/id -G") -- checks if user is in admin group
                         set accessDialog to (display dialog "ADPassMon's \"Change Password\" feature requires assistive access to open the password panel.
@@ -287,8 +287,8 @@ If you do not know your keychain password, enter your new password in the New an
                                     set my accTest to 0
                                     tell defaults to setObject_forKey_(0, "accTest")
                                 on error theError
-                                    set logMe to "Unable to set access. Error: " & theError
-                                    logToFile_(me)
+                                    set theError to "Unable to set access. Error: " & theError
+                                    errorOut_(theError)
                                 end try
                             else
                                 set my accTest to 0
@@ -307,6 +307,10 @@ If you do not know your keychain password, enter your new password in the New an
                     set logMe to "Skipping Accessibility check..."
                     logToFile_(me)
                 end if
+            else
+                set my accTest to 0
+                set logMe to "User chose not to enable"
+                logToFile_(me)
             end if
         else
             set logMe to "Skipping Universal Access Settings Testing..."
@@ -332,8 +336,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                     set logMe to "Now enabled"
                     logToFile_(me)
                 on error theError
-                    set logMe to "Error: " & theError
-                    logToFile_(me)
+                    errorOut_(theError)
                     activate
                     display dialog "Could not enable access for assistive devices." buttons {"OK"} default button 1
                 end try
@@ -644,7 +647,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             else -- if No is clicked
                 set logMe to "User chose not to acquire"
                 logToFile_(me)
-                errorOut_(theError, 1)
+                errorOut_(theError)
             end if
         end try
     end doLionKerb_
@@ -680,8 +683,8 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             try
                 set myLDAPresult to (do shell script "/usr/bin/dig +time=2 +tries=1 -t srv _ldap._tcp." & myDomain) as text
             on error theError
-                set logMe to "Launch domain test timed out."
-                logToFile_(me)
+                set theError to "Launch domain test timed out." & theError
+                errorOut_(theError)
                 set my onDomain to false
             end try
             if "ANSWER SECTION" is in myLDAPresult
@@ -727,7 +730,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                 tell defaults to setObject_forKey_(expireAge, "expireAge")
             end if
         on error theError
-            errorOut_(theError, 1)
+            errorOut_(theError)
         end try
     end getExpireAge_
 
@@ -747,7 +750,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             logToFile_(me)
             tell defaults to setObject_forKey_(expireDateUnix, "expireDateUnix")
         on error theError
-            errorOut_(theError, 1)
+            errorOut_(theError)
         end try
     end easyMethod_
 
@@ -824,7 +827,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             logToFile_(me)
             updateMenuTitle_((daysUntilExpNice as string), expirationDate)
         on error theError
-           errorOut_(theError, 1)
+           errorOut_(theError)
         end try
     end altGetExpiryDate_
 
@@ -913,7 +916,7 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                     end if
                 end if
             on error theError
-                errorOut_(theError, 1)
+                errorOut_(theError)
             end try
         end if
         -- Check for Selected Behaviour
@@ -967,8 +970,8 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                                 click button "Change Password…" of window 1
                             end tell
                         end tell
-                        on error theError
-                        errorOut_(theError, 1)
+                    on error theError
+                        errorOut_(theError)
                     end try
                 end tell
             end if
@@ -1477,7 +1480,8 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
             set my processTimer to current application's NSTimer's scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_((my passwordCheckInterval as integer * 3600), me, "intervalDoProcess:", missing value, true)
             set logMe to "Set check interval to " & passwordCheckInterval & unit
         on error theError
-            set logMe to "Could not reset check interval. Error: " & theError
+            set theError to "Could not reset check interval. Error: " & theError
+            errorOut_(theError)
         end try
     end resetIntervalTimer_
 
