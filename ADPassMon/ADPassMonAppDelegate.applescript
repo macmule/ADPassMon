@@ -255,7 +255,7 @@ If you do not know your keychain password, enter your new password in the New an
                     set accStatus to get UI elements enabled
                 end tell
                 if accStatus is true
-                    set logMe to "Enabled 254"
+                    set logMe to "Enabled"
                     logToFile_(me)
                 else
                     set logMe to "Disabled"
@@ -267,8 +267,8 @@ If you do not know your keychain password, enter your new password in the New an
                 if my accTest as integer is 1
                     if "80" is in (do shell script "/usr/bin/id -G") -- checks if user is in admin group
                         set accessDialog to (display dialog "ADPassMon's \"Change Password\" feature requires assistive access to open the password panel.
-                        
-    Enable it now? (requires password)" with icon 2 buttons {"No","Yes"} default button 2)
+                            
+        Enable it now? (requires password)" with icon 2 buttons {"No","Yes"} default button 2)
                         if button returned of accessDialog is "Yes"
                             set logMe to "Prompting for password"
                             logToFile_(me)
@@ -284,8 +284,6 @@ If you do not know your keychain password, enter your new password in the New an
                                     else
                                         do shell script "sqlite3 '/Library/Application Support/com.apple.TCC/TCC.db' \"INSERT INTO access VALUES('kTCCServiceAccessibility','org.pmbuko.ADPassMon',0,1,1,NULL,NULL);\"" with administrator privileges
                                     end if
-                                    set my accTest to 0
-                                    tell defaults to setObject_forKey_(0, "accTest")
                                 on error theError
                                     set theError to "Unable to set access. Error: " & theError
                                     errorOut_(theError)
@@ -296,10 +294,13 @@ If you do not know your keychain password, enter your new password in the New an
                                 set logMe to "Enabled"
                                 logToFile_(me)
                             end if
+                        else
+                            set my accTest to 0
+                            set logMe to "User chose not to enable"
+                            logToFile_(me)
                         end if
                     else
                         set my accTest to 0
-                        tell defaults to setObject_forKey_(0, "accTest")
                         set logMe to "User not admin. Skipping."
                         logToFile_(me)
                     end if
@@ -307,14 +308,7 @@ If you do not know your keychain password, enter your new password in the New an
                     set logMe to "Skipping Accessibility check..."
                     logToFile_(me)
                 end if
-            else
-                set my accTest to 0
-                set logMe to "User chose not to enable"
-                logToFile_(me)
             end if
-        else
-            set logMe to "Skipping Universal Access Settings Testing..."
-            logToFile_(me)
         end if
     end accTest_
 
