@@ -248,9 +248,9 @@ If you do not know your keychain password, enter your new password in the New an
     on accTest_(sender)
         -- Skip if Behaviour 2 is selected
         if selectedBehaviour is 1
-            set logMe to "Testing Universal Access settings…"
-            logToFile_(me)
             if osVersion is less than 9
+                set logMe to "Testing Universal Access settings…"
+                logToFile_(me)
                 tell application "System Events"
                     set accStatus to get UI elements enabled
                 end tell
@@ -262,52 +262,9 @@ If you do not know your keychain password, enter your new password in the New an
                     logToFile_(me)
                     accEnable_(me)
                 end if
-            else -- if we're running 10.9 or later, Accessibility is handled differently
-                --tell defaults to set my accTest to objectForKey_("accTest")
-                if my accTest as integer is 1
-                    if "80" is in (do shell script "/usr/bin/id -G") -- checks if user is in admin group
-                        set accessDialog to (display dialog "ADPassMon's \"Change Password\" feature requires assistive access to open the password panel.
-                            
-        Enable it now? (requires password)" with icon 2 buttons {"No","Yes"} default button 2)
-                        if button returned of accessDialog is "Yes"
-                            set logMe to "Prompting for password"
-                            logToFile_(me)
-                            try
-                                set mavAccStatus to (do shell script "sqlite3 '/Library/Application Support/com.apple.TCC/TCC.db' \"SELECT * FROM access WHERE client='org.pmbuko.ADPassMon';\"" with administrator privileges)
-                            end try
-                            if mavAccStatus is ""
-                                set logMe to "Not enabled"
-                                logToFile_(me)
-                                try
-                                    if osVersion is less than 11
-                                        do shell script "sqlite3 '/Library/Application Support/com.apple.TCC/TCC.db' \"INSERT INTO access VALUES('kTCCServiceAccessibility','org.pmbuko.ADPassMon',0,1,1,NULL);\"" with administrator privileges
-                                    else
-                                        do shell script "sqlite3 '/Library/Application Support/com.apple.TCC/TCC.db' \"INSERT INTO access VALUES('kTCCServiceAccessibility','org.pmbuko.ADPassMon',0,1,1,NULL,NULL);\"" with administrator privileges
-                                    end if
-                                on error theError
-                                    set theError to "Unable to set access. Error: " & theError
-                                    errorOut_(theError)
-                                end try
-                            else
-                                set my accTest to 0
-                                tell defaults to setObject_forKey_(0, "accTest")
-                                set logMe to "Enabled"
-                                logToFile_(me)
-                            end if
-                        else
-                            set my accTest to 0
-                            set logMe to "User chose not to enable"
-                            logToFile_(me)
-                        end if
-                    else
-                        set my accTest to 0
-                        set logMe to "User not admin. Skipping."
-                        logToFile_(me)
-                    end if
-                else
-                    set logMe to "Skipping Accessibility check..."
-                    logToFile_(me)
-                end if
+            else -- if we're running 10.9 or later, Accessibility is handled differently, so just open the pref pane
+                set logMe to "Skipping Accessibility check..."
+                logToFile_(me)
             end if
         end if
     end accTest_
@@ -956,14 +913,16 @@ Enable it now?" with icon 2 buttons {"No","Yes"} default button 2)
                     try -- to use UI scripting
                         set current pane to pane id "com.apple.preferences.users"
                         activate
-                        delay 1
-                        tell application "System Events"
-                            tell application process "System Preferences"
-                                click radio button "Password" of tab group 1 of window "Users & Groups"
-                                click button "Change Password…" of tab group 1 of window "Users & Groups"
-                                click button "Change Password…" of window 1
+                        if osVersion is less than 9
+                            delay 1
+                            tell application "System Events"
+                                tell application process "System Preferences"
+                                    click radio button "Password" of tab group 1 of window "Users & Groups"
+                                    click button "Change Password…" of tab group 1 of window "Users & Groups"
+                                    click button "Change Password…" of window 1
+                                end tell
                             end tell
-                        end tell
+                        end if
                     on error theError
                         errorOut_(theError)
                     end try
